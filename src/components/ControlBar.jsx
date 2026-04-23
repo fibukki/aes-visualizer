@@ -20,9 +20,9 @@ const OP_COLOR = {
 };
 
 const SPEEDS = [
-  { label: 'SLOW',   value: 3.0, key: 's' },
-  { label: 'NORM',   value: 1.4, key: 'n' },
-  { label: 'FAST',   value: 0.4, key: 'f' },
+  { label: 'SLOW',   value: 3.5, key: 's' },
+  { label: 'NORM',   value: 2.0, key: 'n' },
+  { label: 'FAST',   value: 0.5, key: 'f' }, 
 ];
 
 const CONFIRM_LABEL = {

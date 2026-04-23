@@ -1,57 +1,49 @@
 import { motion, AnimatePresence } from 'framer-motion';
-
-const INV_SBOX_PARTIAL = [
-  [0x52,0x09,0x6a,0xd5,0x30,0x36,0xa5,0x38],
-  [0xbf,0x40,0xa3,0x9e,0x81,0xf3,0xd7,0xfb],
-  [0x7c,0xe3,0x39,0x82,0x9b,0x2f,0xff,0x87],
-  [0x34,0x8e,0x43,0x44,0xc4,0xde,0xe9,0xcb],
-  [0x54,0x7b,0x94,0x32,0xa6,0xc2,0x23,0x3d],
-  [0xee,0x4c,0x95,0x0b,0x42,0xfa,0xc3,0x4e],
-  [0x08,0x2e,0xa1,0x66,0x28,0xd9,0x24,0xb2],
-  [0x76,0x5b,0xa2,0x49,0x6d,0x8b,0xd1,0x25],
-];
+import { INV_SBOX } from '../aes';
 
 function SBoxTable({ highlightByte }) {
   const hl = highlightByte !== undefined ? highlightByte : -1;
-  
-  const hlRow = hl >= 0 ? Math.floor(hl / 8) : -1;
-  const hlCol = hl >= 0 ? hl % 8 : -1;
-  const inRange = hlRow >= 0 && hlRow < 8;
+  const hlRow = hl >= 0 ? Math.floor(hl / 16) : -1;
+  const hlCol = hl >= 0 ? hl % 16 : -1;
+
+  const fullTable = Array.from({ length: 16 }, (_, r) =>
+    Array.from({ length: 16 }, (_, c) => INV_SBOX[r * 16 + c])
+  );
 
   return (
     <div>
       <div style={{ fontFamily:'Orbitron,monospace', fontSize:9, fontWeight:700, color:'var(--text-3)', letterSpacing:2, marginBottom:8 }}>
-        INV S-BOX LOOKUP (rows 0x00–0x3F)
+        INV S-BOX LOOKUP (16×16)
       </div>
-      {inRange && (
+      {hl >= 0 && (
         <div style={{ marginBottom:8, padding:'6px 10px', background:'var(--bg-card2)', border:'1px solid var(--accent-hl)', fontSize:12 }}>
           <span style={{ fontFamily:'Share Tech Mono,monospace', color:'var(--text-2)' }}>
-            InvSBox[<span style={{ color:'var(--accent)', fontWeight:700 }}>0x{(hl).toString(16).padStart(2,'0').toUpperCase()}</span>]
+            InvSBox[<span style={{ color:'var(--accent)', fontWeight:700 }}>0x{hl.toString(16).padStart(2,'0').toUpperCase()}</span>]
             {' = '}
             <span style={{ color:'var(--text)', fontWeight:700 }}>
-              0x{INV_SBOX_PARTIAL[hlRow][hlCol].toString(16).padStart(2,'0').toUpperCase()}
+              0x{INV_SBOX[hl].toString(16).padStart(2,'0').toUpperCase()}
             </span>
           </span>
         </div>
       )}
-      <div style={{ overflowX:'auto' }}>
-        <table className="sbox-table">
+      <div style={{ overflowX:'auto', maxHeight: 400 }}>
+        <table className="sbox-table" style={{ fontSize: 10 }}>
           <thead>
             <tr>
-              <th style={{ color:'var(--text-dim)', width:28 }}></th>
-              {[0,1,2,3,4,5,6,7].map(c => (
-                <th key={c}>_{c.toString(16).toUpperCase()}</th>
+              <th style={{ width: 28 }}></th>
+              {Array.from({ length: 16 }, (_, c) => (
+                <th key={c}>{c.toString(16).toUpperCase()}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {INV_SBOX_PARTIAL.map((row, ri) => (
+            {fullTable.map((row, ri) => (
               <tr key={ri}>
-                <td style={{ color:'var(--text-3)', fontWeight:600, borderColor:'var(--border)' }}>
-                  {(ri).toString(16).toUpperCase()}_
+                <td style={{ fontWeight: 600, color: 'var(--text-3)' }}>
+                  {ri.toString(16).toUpperCase()}
                 </td>
                 {row.map((val, ci) => {
-                  const active = inRange && ri === hlRow && ci === hlCol;
+                  const active = hl >= 0 && ri === hlRow && ci === hlCol;
                   return (
                     <td key={ci} className={active ? 'sbox-active' : ''}>
                       {val.toString(16).padStart(2,'0').toUpperCase()}
@@ -231,13 +223,13 @@ const CONTENT = {
     title: 'ADD ROUND KEY',
     accent: 'var(--accent-warn)',
     body: 'Every byte in the state is XOR\'d (⊕) with the corresponding byte from the round key. XOR is its own inverse — so applying the same key twice recovers the original value. The round key comes from the Key Schedule.',
-    diagram: null, 
+    diagram: null,
   },
   invSubBytes: {
     title: 'INV SUB BYTES',
     accent: 'var(--accent-hl)',
     body: 'Each state byte is replaced using the AES Inverse S-Box — a non-linear substitution table built over GF(2⁸). The highlighted cell in the matrix and the table below show which byte is currently being substituted.',
-    diagram: null, 
+    diagram: null,
   },
   invShiftRows: {
     title: 'INV SHIFT ROWS',
@@ -285,7 +277,6 @@ export default function AlgorithmPanel({ step, roundKey, highlightByte }) {
             exit={{ opacity:0, y:-10 }}
             transition={{ duration:0.22 }}
           >
-            
             <div style={{
               fontFamily:'Orbitron,monospace', fontSize:12, fontWeight:900,
               letterSpacing:2, color:info.accent,

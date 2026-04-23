@@ -1,17 +1,20 @@
 import { motion } from 'framer-motion';
 
 const PIPELINE = [
-  { id: 'ark10',  label: 'ARK₁₀',    op: 'addRoundKey',   round: 10 },
-  { id: 'isub9',  label: 'InvSub₉',  op: 'invSubBytes',   round: 9 },
-  { id: 'ishr9',  label: 'InvShr₉',  op: 'invShiftRows',  round: 9 },
-  { id: 'imc9',   label: 'InvMix₉',  op: 'invMixColumns', round: 9 },
-  { id: 'ark9',   label: 'ARK₉',     op: 'addRoundKey',   round: 9 },
-  { id: 'dots',   label: '···',       op: null,            round: null },
-  { id: 'ark1',   label: 'ARK₁',     op: 'addRoundKey',   round: 1 },
-  { id: 'isub0',  label: 'InvSub₀',  op: 'invSubBytes',   round: 0 },
-  { id: 'ishr0',  label: 'InvShr₀',  op: 'invShiftRows',  round: 0 },
-  { id: 'ark0',   label: 'ARK₀',     op: 'addRoundKey',   round: 0 },
-  { id: 'done',   label: 'Plain',     op: 'final',         round: 0 },
+  { id: 'ark10', label: 'ARK₁₀', op: 'addRoundKey', round: 10 },
+  { id: 'isr9',  label: 'InvShr₉', op: 'invShiftRows', round: 9 },
+  { id: 'isub9', label: 'InvSub₉', op: 'invSubBytes', round: 9 },
+  { id: 'ark9',  label: 'ARK₉', op: 'addRoundKey', round: 9 },
+  { id: 'imc9',  label: 'InvMix₉', op: 'invMixColumns', round: 9 },
+  { id: 'dots',  label: '···', op: null, round: null },
+  { id: 'isr1',  label: 'InvShr₁', op: 'invShiftRows', round: 1 },
+  { id: 'isub1', label: 'InvSub₁', op: 'invSubBytes', round: 1 },
+  { id: 'ark1',  label: 'ARK₁', op: 'addRoundKey', round: 1 },
+  { id: 'imc1',  label: 'InvMix₁', op: 'invMixColumns', round: 1 },
+  { id: 'isr0',  label: 'InvShr₀', op: 'invShiftRows', round: 0 },
+  { id: 'isub0', label: 'InvSub₀', op: 'invSubBytes', round: 0 },
+  { id: 'ark0',  label: 'ARK₀', op: 'addRoundKey', round: 0 },
+  { id: 'done',  label: 'Plain', op: 'final', round: 0 },
 ];
 
 function isActive(pill, step) {
