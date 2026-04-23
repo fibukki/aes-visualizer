@@ -82,8 +82,7 @@ export default function App() {
   const [inputError, setInputError] = useState('');
   const [toast, setToast] = useState(null);
 
-  // Custom ciphertext state
-  const [ciphertextMode, setCiphertextMode] = useState('auto'); // 'auto' or 'custom'
+  const [ciphertextMode, setCiphertextMode] = useState('auto');
   const [customCiphertextHex, setCustomCiphertextHex] = useState('');
   const [ciphertextError, setCiphertextError] = useState('');
   const [currentCiphertext, setCurrentCiphertext] = useState(() => encrypt(Array.from(new TextEncoder().encode('AES Decrypt Demo')), randomBytes(16)));
@@ -92,7 +91,6 @@ export default function App() {
 
   const getCipher = useCallback(() => encrypt(plainBytes, keyBytes), [plainBytes, keyBytes]);
 
-  // Update current ciphertext when auto mode changes
   useEffect(() => {
     if (ciphertextMode === 'auto') {
       setCurrentCiphertext(getCipher());
@@ -236,7 +234,6 @@ export default function App() {
     reset();
   }, [reset]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!started) return;
