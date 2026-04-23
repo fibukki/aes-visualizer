@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toRowMajor, hex2, CELL, GAP, STEP } from './shared';
 
-export default function CrossfadeGrid({ fromState, toState, op, onDone }) {
-  const [phase, setPhase] = useState('from'); 
+export default function CrossfadeGrid({ fromState, toState, op, onDone, speedMult = 1 }) {
+  const [phase, setPhase] = useState('from');
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('to'), 80);
-    const t2 = setTimeout(() => onDone?.(), 80 + 16 * 35 + 320);
+    const t1 = setTimeout(() => setPhase('to'), 80 * speedMult);
+    const t2 = setTimeout(() => onDone?.(), (80 + 16 * 35 + 320) * speedMult);
     return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, []);
+  }, [speedMult, onDone]);
 
   const cells = toRowMajor(phase === 'to' ? toState : fromState);
 

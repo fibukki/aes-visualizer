@@ -22,7 +22,7 @@ export default function SubBytesAnim({
   const [scanPhase, setScanPhase] = useState('lookup');
   const [appliedCells, setApplied] = useState([]);
   const [finished, setFinished]   = useState(false);
-  const [waiting, setWaiting]     = useState(false);  
+  const [waiting, setWaiting]     = useState(false);
 
   const lookupMs  = Math.max(50, Math.round(speedMult * 290));
   const applyMs   = Math.max(80, Math.round(speedMult * 520));
@@ -33,11 +33,21 @@ export default function SubBytesAnim({
     return { row, col, displayIdx: di, value: fromState[col * 4 + row] };
   });
 
+  const confirmAllRemaining = () => {
+    const remaining = 16 - appliedCells.length;
+    for (let i = 0; i < remaining; i++) {
+      setTimeout(() => {
+        setApplied(prev => [...prev, scanIdx + i]);
+      }, i * 50);
+    }
+    setFinished(true);
+    setTimeout(() => onDone?.(), 400);
+  };
+
   useEffect(() => {
     if (finished) return;
 
     if (!manualMode) {
-      
       const t1 = setTimeout(() => setScanPhase('apply'), lookupMs);
       const t2 = setTimeout(() => {
         setApplied(prev => [...prev, scanIdx]);
@@ -51,7 +61,6 @@ export default function SubBytesAnim({
       }, applyMs);
       return () => { clearTimeout(t1); clearTimeout(t2); };
     } else {
-      
       setWaiting(true);
       onWaitConfirm?.(() => {
         setWaiting(false);
@@ -69,7 +78,7 @@ export default function SubBytesAnim({
       });
       return () => setWaiting(false);
     }
-  }, [scanIdx, finished, manualMode]);
+  }, [scanIdx, finished, manualMode, speedMult, onDone]);
 
   const scanRow = Math.floor(scanIdx / 4);
   const scanCol = scanIdx % 4;
@@ -182,6 +191,29 @@ export default function SubBytesAnim({
             />
           ))}
         </div>
+
+        {/* Confirm All button – appears only in manual mode waiting state */}
+        {manualMode && waiting && scanPhase === 'lookup' && (
+          <button
+            onClick={confirmAllRemaining}
+            style={{
+              marginTop: 8,
+              fontFamily: 'Orbitron, monospace',
+              fontSize: 9,
+              padding: '6px 12px',
+              border: '1px solid var(--accent-green)',
+              background: 'color-mix(in srgb, var(--accent-green) 8%, var(--bg-card2))',
+              color: 'var(--accent-green)',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              letterSpacing: 1,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--accent-green) 18%, var(--bg-card2))'}
+            onMouseLeave={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--accent-green) 8%, var(--bg-card2))'}
+          >
+            ⚡ CONFIRM ALL REMAINING
+          </button>
+        )}
       </div>
 
       <div style={{ flexShrink: 0 }}>
@@ -195,7 +227,6 @@ export default function SubBytesAnim({
         </div>
 
         <div style={{ position: 'relative', display: 'inline-block' }}>
-          
           <motion.div
             animate={{ top: (curHi + 1) * (CELL_SB + 1) + 1 }}
             transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
@@ -207,7 +238,6 @@ export default function SubBytesAnim({
               pointerEvents: 'none', zIndex: 1,
             }}
           />
-          
           <motion.div
             animate={{ left: (curLo + 1) * (CELL_SB + 1) + 1 }}
             transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
