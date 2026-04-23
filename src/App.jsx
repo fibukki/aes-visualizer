@@ -77,13 +77,27 @@ export default function App() {
   const [theme, setTheme]   = useState('dark');
   const [tab, setTab]       = useState(0);
   const [keyBytes, setKeyBytes] = useState(() => randomBytes(16));
-  const [plainBytes, setPlainBytes] = useState(() => Array.from(new TextEncoder().encode('AES Decrypt Demo!')));
-  const [plaintextInput, setPlaintextInput] = useState('AES Decrypt Demo!');
+  const [plainBytes, setPlainBytes] = useState(() => Array.from(new TextEncoder().encode('AES Decrypt Demo')));
+  const [plaintextInput, setPlaintextInput] = useState('AES Decrypt Demo');
   const [inputError, setInputError] = useState('');
+  const [toast, setToast] = useState(null);
+
+  // Custom ciphertext state
+  const [ciphertextMode, setCiphertextMode] = useState('auto'); // 'auto' or 'custom'
+  const [customCiphertextHex, setCustomCiphertextHex] = useState('');
+  const [ciphertextError, setCiphertextError] = useState('');
+  const [currentCiphertext, setCurrentCiphertext] = useState(() => encrypt(Array.from(new TextEncoder().encode('AES Decrypt Demo')), randomBytes(16)));
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
 
   const getCipher = useCallback(() => encrypt(plainBytes, keyBytes), [plainBytes, keyBytes]);
+
+  // Update current ciphertext when auto mode changes
+  useEffect(() => {
+    if (ciphertextMode === 'auto') {
+      setCurrentCiphertext(getCipher());
+    }
+  }, [ciphertextMode, getCipher]);
 
   const vizRef      = useRef(null);
   const playRef     = useRef(null);
@@ -93,17 +107,37 @@ export default function App() {
   const [started, setStarted]               = useState(false);
   const [isPlaying, setIsPlaying]           = useState(false);
 
-  const [speed, setSpeed]           = useState(1.4);       
+  const [speed, setSpeed]           = useState(2.0);
   const [manualMode, setManualMode] = useState(false);
-  const speedMult = speed / 0.8; 
+  const speedMult = speed;
 
   const [displayedState, setDisplayedState] = useState(null);
   const [anim, setAnim]                     = useState(null);
   const [animNeedsConfirm, setAnimNeedsConfirm] = useState(false);
   const animBusy = !!anim;
 
-  const initViz = useCallback(() => {
-    const ct = getCipher();
+  const parseCustomCiphertext = useCallback(() => {
+    const hex = customCiphertextHex.trim().toUpperCase();
+    if (!/^[0-9A-F]{32}$/.test(hex)) {
+      setCiphertextError('Must be exactly 32 hex characters (128 bits)');
+      return null;
+    }
+    setCiphertextError('');
+    const bytes = [];
+    for (let i = 0; i < 32; i += 2) {
+      bytes.push(parseInt(hex.substr(i, 2), 16));
+    }
+    return bytes;
+  }, [customCiphertextHex]);
+
+  const initViz = useCallback((customCt = null) => {
+    let ct;
+    if (ciphertextMode === 'custom' && customCt) {
+      ct = customCt;
+    } else {
+      ct = getCipher();
+    }
+    setCurrentCiphertext(ct);
     vizRef.current = new AESVisualizer(ct, keyBytes);
     const first = vizRef.current.current;
     setStep({ ...first });
@@ -112,13 +146,22 @@ export default function App() {
     setStarted(true);
     setAnim(null);
     setIsPlaying(false);
-  }, [getCipher, keyBytes]);
+  }, [getCipher, keyBytes, ciphertextMode]);
+
+  const startWithCustomCiphertext = useCallback(() => {
+    const ct = parseCustomCiphertext();
+    if (ct) {
+      initViz(ct);
+    }
+  }, [parseCustomCiphertext, initViz]);
 
   const reset = useCallback(() => {
     setIsPlaying(false); setStarted(false);
     setStep(null); setDisplayedState(null);
     setAnim(null); setAnimNeedsConfirm(false);
     confirmRef.current = null; vizRef.current = null;
+    setToast({ message: 'Visualizer reset', type: 'info' });
+    setTimeout(() => setToast(null), 2000);
   }, []);
 
   const triggerNext = useCallback(() => {
@@ -127,7 +170,6 @@ export default function App() {
     if (viz.currentStep >= viz.totalSteps - 1) return;
 
     const fromState = [...viz.current.state];
-    
     const nextStepData = viz.steps[viz.currentStep + 1];
     const toState      = [...nextStepData.state];
     const { op, roundKey } = nextStepData;
@@ -177,22 +219,50 @@ export default function App() {
       const viz = vizRef.current;
       if (viz.currentStep >= viz.totalSteps - 1) { setIsPlaying(false); return; }
       triggerNext();
-    }, 2200);
+    }, 2800 / speedMult);
     return () => clearInterval(playRef.current);
-  }, [isPlaying, animBusy, triggerNext]);
+  }, [isPlaying, animBusy, triggerNext, speedMult]);
 
   const applyPlaintext = useCallback(() => {
     const bytes = Array.from(new TextEncoder().encode(plaintextInput));
     if (bytes.length !== 16) { setInputError('Must be exactly 16 ASCII chars'); return; }
     setPlainBytes(bytes); setInputError(''); reset();
+    setToast({ message: 'Plaintext updated – visualizer reset', type: 'info' });
+    setTimeout(() => setToast(null), 2000);
   }, [plaintextInput, reset]);
 
-  const ct = getCipher();
+  const handleKeyChange = useCallback((newKey) => {
+    setKeyBytes(newKey);
+    reset();
+  }, [reset]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!started) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!animBusy && !animNeedsConfirm) setIsPlaying(p => !p);
+      }
+      if (e.code === 'ArrowRight' && !animBusy && !isPlaying && !animNeedsConfirm) {
+        triggerNext();
+      }
+      if (e.code === 'ArrowLeft' && !animBusy && !isPlaying) {
+        goBack();
+      }
+      if (e.code === 'KeyM') {
+        setManualMode(m => !m);
+      }
+      if (e.code === 'KeyC' && animNeedsConfirm) {
+        handleConfirm();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [started, animBusy, animNeedsConfirm, isPlaying, triggerNext, goBack, handleConfirm]);
+
   const totalSteps = vizRef.current?.totalSteps ?? 0;
   const plain = step?.op === 'final' ? step.state : null;
-
-  const nextOp = vizRef.current?.steps[vizRef.current?.currentStep + 1]?.op;
-  const statusForControlBar = animBusy ? `Animating: ${anim?.op || ''}…` : undefined;
 
   return (
     <div data-theme={theme} style={{ minHeight:'100vh', display:'flex', flexDirection:'column', paddingBottom:128 }}>
@@ -248,8 +318,8 @@ export default function App() {
 
               <div style={{ padding:'14px', display:'flex', flexDirection:'column', gap:14 }}>
                 <SectionCard label="KEY (128-BIT)" accentVar="--accent-warn">
-                  <SegmentedKeyInput keyBytes={keyBytes} onChange={k => { setKeyBytes(k); reset(); }} />
-                  <button className="btn btn-filled" onClick={() => { reset(); setKeyBytes(randomBytes(16)); }}
+                  <SegmentedKeyInput keyBytes={keyBytes} onChange={handleKeyChange} />
+                  <button className="btn btn-filled" onClick={() => { handleKeyChange(randomBytes(16)); }}
                     style={{ marginTop:10, width:'100%', borderColor:'var(--accent-warn)', color:'var(--accent-warn)' }}>
                     🔑 Generate New Key
                   </button>
@@ -272,21 +342,98 @@ export default function App() {
                   </button>
                 </SectionCard>
 
+                <SectionCard label="CIPHERTEXT SOURCE" accentVar="--accent">
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                    <button
+                      onClick={() => setCiphertextMode('auto')}
+                      style={{
+                        flex: 1, fontFamily: 'Orbitron,monospace', fontSize: 9,
+                        padding: '6px', border: `1.5px solid ${ciphertextMode === 'auto' ? 'var(--accent)' : 'var(--border)'}`,
+                        background: ciphertextMode === 'auto' ? 'color-mix(in srgb, var(--accent) 10%, var(--bg-card))' : 'transparent',
+                        color: ciphertextMode === 'auto' ? 'var(--accent)' : 'var(--text-3)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      DERIVE FROM PLAINTEXT
+                    </button>
+                    <button
+                      onClick={() => setCiphertextMode('custom')}
+                      style={{
+                        flex: 1, fontFamily: 'Orbitron,monospace', fontSize: 9,
+                        padding: '6px', border: `1.5px solid ${ciphertextMode === 'custom' ? 'var(--accent)' : 'var(--border)'}`,
+                        background: ciphertextMode === 'custom' ? 'color-mix(in srgb, var(--accent) 10%, var(--bg-card))' : 'transparent',
+                        color: ciphertextMode === 'custom' ? 'var(--accent)' : 'var(--text-3)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      PASTE CUSTOM HEX
+                    </button>
+                  </div>
+
+                  {ciphertextMode === 'custom' && (
+                    <>
+                      <input
+                        value={customCiphertextHex}
+                        onChange={e => setCustomCiphertextHex(e.target.value.toUpperCase())}
+                        placeholder="e.g., 00112233445566778899AABBCCDDEEFF"
+                        maxLength={32}
+                        style={{
+                          width: '100%', background: 'var(--bg-input)', border: '1.5px solid var(--border)',
+                          color: 'var(--text)', fontFamily: 'Share Tech Mono,monospace', fontSize: 11,
+                          padding: '8px 10px', outline: 'none', marginBottom: 8,
+                        }}
+                        onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                        onBlur={e => e.target.style.borderColor = 'var(--border)'}
+                      />
+                      {ciphertextError && (
+                        <p style={{ fontFamily: 'Share Tech Mono,monospace', fontSize: 10, color: 'var(--accent-red)', marginBottom: 8 }}>
+                          {ciphertextError}
+                        </p>
+                      )}
+                      <button
+                        className="btn"
+                        onClick={startWithCustomCiphertext}
+                        disabled={!!ciphertextError || customCiphertextHex.length !== 32}
+                        style={{ width: '100%', borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                      >
+                        ▶ DECRYPT CIPHERTEXT
+                      </button>
+                    </>
+                  )}
+                </SectionCard>
+
                 <div style={{ background:'var(--bg-card2)', border:'1px solid var(--border-2)', padding:'10px 12px' }}>
                   <div style={{ fontFamily:'Orbitron,monospace', fontSize:8, fontWeight:700, letterSpacing:3, color:'var(--text-3)', marginBottom:6 }}>
                     CIPHERTEXT (HEX)
                   </div>
-                  <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:11, color:'var(--text-2)', wordBreak:'break-all', lineHeight:1.7 }}>
-                    {ct.map(toHex2).join('')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8 }}>
+                    <div style={{ fontFamily:'Share Tech Mono,monospace', fontSize:11, color:'var(--text-2)', wordBreak:'break-all', lineHeight:1.7 }}>
+                      {currentCiphertext.map(toHex2).join('')}
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentCiphertext.map(toHex2).join(''));
+                        setToast({ message: 'Ciphertext copied!', type: 'info' });
+                        setTimeout(() => setToast(null), 1500);
+                      }}
+                      style={{
+                        background:'transparent', border:'1px solid var(--border)', color:'var(--text-3)',
+                        fontFamily:'Orbitron,monospace', fontSize:8, padding:'4px 8px', cursor:'pointer',
+                      }}
+                    >
+                      📋 Copy
+                    </button>
                   </div>
                 </div>
 
-                {!started ? (
-                  <button className="btn btn-filled" onClick={initViz}
+                {!started && ciphertextMode === 'auto' && (
+                  <button className="btn btn-filled" onClick={() => initViz()}
                     style={{ padding:'12px', fontSize:11, fontWeight:700 }}>
                     ▶ START DECRYPTION
                   </button>
-                ) : (
+                )}
+
+                {started && (
                   <div style={{
                     background:'var(--bg-card2)',
                     border:`1.5px solid ${plain ? 'var(--accent-green)' : 'var(--border)'}`,
@@ -425,6 +572,17 @@ export default function App() {
         animNeedsConfirm={animNeedsConfirm}
         onConfirm={handleConfirm}
       />
+
+      {toast && (
+        <div style={{
+          position:'fixed', bottom:80, left:'50%', transform:'translateX(-50%)',
+          background:'var(--bg-card)', border:'1px solid var(--accent)',
+          padding:'8px 20px', fontFamily:'Orbitron,monospace', fontSize:12,
+          zIndex:200, boxShadow:'var(--shadow)',
+        }}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
